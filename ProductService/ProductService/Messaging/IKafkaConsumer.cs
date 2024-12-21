@@ -1,8 +1,11 @@
-﻿namespace ProductsService.Messaging
+﻿using ProductsService.DTOs;
+
+
+namespace ProductsService.Messaging
 {
     public interface IKafkaConsumer
     {
-        //Task StartConsumingAsyng(CancellationToken cancellationToken);
-        //Task WorkWithProductInfoMessage(int message,CancellationToken cancellationToken);
+        Task StartConsumingAsyng(CancellationToken cancellationToken);
+        Task WorkWithProductInfoMessage(OrderItemDTO orderItemDTO, CancellationToken cancellationToken);
     }
 }
