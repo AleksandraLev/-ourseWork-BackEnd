@@ -24,7 +24,7 @@ namespace OrdersService.Repositories
             {
                 throw new OrderSavedFailedException("Не удалось создать заказ.");
             }
-            catch (DbUpdateException ex)
+            catch (DbUpdateException)
             {
                 //Console.WriteLine($"Не удалось создать заказ. Ошибка при сохранении: {ex.Message}");
                 throw new OrderSavedFailedException("Не удалось создать заказ.");

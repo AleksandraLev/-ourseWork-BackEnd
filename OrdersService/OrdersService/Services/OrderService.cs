@@ -33,17 +33,80 @@ namespace OrdersService.Services
             try
             {
                 await _repository.CreateOrderAsync(order);
-                Console.WriteLine($"OrderId: {order.Id}");
+                //Console.WriteLine($"OrderId: {order.Id}");
                 await transation.CommitAsync();
-                foreach (var item in createOrderDTO.Items)
+                await _orderItemServise.CreateOrderItemsAsync(createOrderDTO.Items, order.Id);
+                /*foreach (var item in createOrderDTO.Items)
                 {
                     await _orderItemServise.CreateOrderItemAsync(item, order.Id);
-                }
+                }*/
+                await ProcessOrderAsync(order);
             }
             catch
             {
                 await transation.RollbackAsync();
                 throw new OrderSavedFailedException();
+            }
+        }
+        public async Task ProcessOrderAsync(Order order)
+        {
+            order.ProcessStatus();
+            var transation = await _repository.BeginTransactionAsync();
+            try
+            {
+                await _repository.SaveChangesAsync();
+                await transation.CommitAsync();
+            }
+            catch
+            {
+                await transation.RollbackAsync();
+                throw new ChangeOrderStatusException();
+            }
+        }
+        public async Task ShipOrderAsync(int orderId)
+        {
+            Order order = await _repository.SelectOrderByIdAsync(orderId);
+            order.ShipStatus();
+            var transation = await _repository.BeginTransactionAsync();
+            try
+            {
+                await _repository.SaveChangesAsync();
+                await transation.CommitAsync();
+            }
+            catch
+            {
+                await transation.RollbackAsync();
+                throw new ChangeOrderStatusException();
+            }
+        }
+        public async Task AfterProcessOrderAsync(List<KafkaProductDTO> kafkaProductDTO)
+        {
+            if (kafkaProductDTO == null || !kafkaProductDTO.Any())
+            {
+                Console.WriteLine("Список товаров пуст.");
+                return;
+            }
+            foreach (var item in kafkaProductDTO)
+            {
+                if (!item.ProductExist)
+                    Console.WriteLine($"Товар \"{item.ProductId}\" не найден.");
+                else if (item.Quantity == 1)
+                    Console.WriteLine($"Товара нет на складе");
+                else
+                    Console.WriteLine($"Товар отсутствует на складе в запрашиваемом колличестве.");
+            }
+            Order order = await _repository.SelectOrderByIdAsync(kafkaProductDTO.First().OrderId);
+            order.CanceleStatus();
+            var transation = await _repository.BeginTransactionAsync();
+            try
+            {
+                await _repository.SaveChangesAsync();
+                await transation.CommitAsync();
+            }
+            catch
+            {
+                await transation.RollbackAsync();
+                throw new ChangeOrderStatusException();
             }
         }
         public async Task CancelOrderAsync(int orderNummber)

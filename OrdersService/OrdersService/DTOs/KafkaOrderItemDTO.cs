@@ -3,8 +3,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace OrdersService.DTOs
 {
-    public class CreateOrderItemDTO
+    public class KafkaOrderItemDTO
     {
+        [Required]
+        public int OrderId { get; set; }
+
         [Required]
         public int ProductId { get; set; }
 

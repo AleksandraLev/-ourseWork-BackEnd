@@ -10,5 +10,8 @@ namespace OrdersService.Services
         //Task<Dictionary<string, string>> GetOrderDetailsAsync(int orderNummber);
         Task<AllOrderInfoDTO> GetOrderDetailsAsync(int orderNummber);
         Task<List<Order>> GetAllOrdersOfUser();
+        Task ProcessOrderAsync(Order order);
+        Task ShipOrderAsync(int orderId);
+        Task AfterProcessOrderAsync(List<KafkaProductDTO> kafkaProductDTO);
     }
 }

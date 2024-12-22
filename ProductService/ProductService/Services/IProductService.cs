@@ -16,5 +16,6 @@ namespace ProductsService.Services
         Task<List<ProductInfoDTO>> GetAllProductNamesAsync();
         Task<List<ProductInfoDTO>> GetProductsSelectedByPriseAsync(MinAmdMaxPrisesDTO prisesDTO);
         Task<Product> GetByIdAsync(int Id);
+        Task CheckOrderInfoAsync(List<KafkaOrderItemDTO> kafkaOrderItemDTO);
     }
 }

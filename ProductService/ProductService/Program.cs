@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using ProductsService.Data;
+using ProductsService.Messaging;
 using ProductsService.Repositories;
 using ProductsService.Security;
 using ProductsService.Services;
@@ -48,6 +49,9 @@ builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddSingleton<IKafkaProduserService, KafkaProduserService>();
+builder.Services.AddSingleton<IKafkaConsumerService, KafkaConsumerService>();
+builder.Services.AddSingleton<IHostedService, KafkaConsumerBackgroundService>();
 
 // Добавляем контекст AppDbContext в качестве сервиса в приложение
 builder.Services.AddDbContext<AppDbContext>();

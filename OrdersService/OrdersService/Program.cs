@@ -58,6 +58,8 @@ builder.Services.AddScoped<IOrderItemRepository, OrderItemRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IOrderItemService, OrderItemService>();
 builder.Services.AddSingleton<IKafkaProduserService, KafkaProduserService>();
+builder.Services.AddSingleton<IKafkaConsumerService, KafkaConsumerService>();
+builder.Services.AddSingleton<IHostedService, KafkaConsumerBackgroundService>();
 
 // Добавляем контекст AppDbContext в качестве сервиса в приложение
 builder.Services.AddDbContext<AppDbContext>();

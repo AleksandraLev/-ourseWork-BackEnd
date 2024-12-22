@@ -35,7 +35,7 @@ namespace ClothingStore.Services
                         issuer: JwtAuthOptions.ISSUER,
                         audience: JwtAuthOptions.AUDIENCE,
                         claims: claims,
-                expires: DateTime.UtcNow.Add(TimeSpan.FromMinutes(1)),
+                expires: DateTime.UtcNow.Add(TimeSpan.FromMinutes(5)),
                         signingCredentials: new SigningCredentials(JwtAuthOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256));
                 return new JwtSecurityTokenHandler().WriteToken(jwt);
             }

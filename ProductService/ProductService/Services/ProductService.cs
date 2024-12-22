@@ -3,6 +3,7 @@ using ProductsService.Model;
 using ProductsService.Services.Exceptions;
 using ProductsService.Repositories;
 using ProductsService.Repositories.Exceptions;
+using ProductsService.Messaging;
 
 namespace ProductsService.Services
 {
@@ -10,10 +11,13 @@ namespace ProductsService.Services
     {
         private readonly IProductRepository _repository;
         private readonly ICategoryService _categoryService;
-        public ProductService(IProductRepository repository, ICategoryService categoryService)
+        private readonly IKafkaProduserService _kafkaProduserService;
+
+        public ProductService(IProductRepository repository, ICategoryService categoryService, IKafkaProduserService kafkaProduserService)
         {
             _repository = repository;
             _categoryService = categoryService;
+            _kafkaProduserService = kafkaProduserService;
         }
         public async Task CreateProductAsync(AddProductDTO addProductDTO)
         {
@@ -281,6 +285,204 @@ namespace ProductsService.Services
             {
                 throw new GetProductException("Ошибка при получении товара.");
             }
+        }
+        public async Task CheckOrderInfoAsync(List<KafkaOrderItemDTO> kafkaOrderItemDTO)
+        {
+            /*KafkaProductDTO kafkaProductDTO = new KafkaProductDTO();
+            if(kafkaOrderItemDTO != null)
+            {
+                var product = await _repository.SelectProductByIdAsync(kafkaOrderItemDTO.ProductId);
+                if (product == null)
+                {
+                    kafkaProductDTO.ProductExist = false;
+                    kafkaProductDTO.ProductId = kafkaOrderItemDTO.ProductId;
+                    kafkaProductDTO.QuantityExist = false;
+                    kafkaProductDTO.OrderItemId = kafkaOrderItemDTO.Id;
+                    kafkaProductDTO.OrderId = kafkaOrderItemDTO.OrderId;
+                }
+                else
+                {
+                    kafkaProductDTO.ProductExist = true;
+                    kafkaProductDTO.ProductId = kafkaOrderItemDTO.ProductId;
+                }
+                try
+                {
+                    product = await _repository.SelectProductByIdAsync(kafkaOrderItemDTO.ProductId);
+                }
+                catch (ArgumentNullException)
+                {
+                    kafkaProductDTO.ProductId = false;
+                    //throw new GetProductException("Ошибка при получении товара.");
+                }
+                catch (OperationCanceledException)
+                {
+                    kafkaProductDTO.ProductId = false;
+                    //throw new GetProductException("Ошибка при получении товара.");
+                }
+                if (product != null)
+                {
+                    if (kafkaOrderItemDTO.Quantity <= product.StockQuantity)
+                    {
+                        kafkaProductDTO.QuantityExist = true;
+                        kafkaProductDTO.Quantity = kafkaOrderItemDTO.Quantity;
+                        product.StockQuantity -= kafkaOrderItemDTO.Quantity;
+
+                        kafkaProductDTO.OrderItemId = kafkaOrderItemDTO.Id;
+                        kafkaProductDTO.OrderId = kafkaOrderItemDTO.OrderId;
+                        kafkaProductDTO.Price = product.Price;
+
+                        var transation = await _repository.BeginTransactionAsync();
+                        try
+                        {
+                            await _repository.SaveChangesAsync();
+                            await transation.CommitAsync();
+                        }
+                        catch (ProductSavedFaledException)
+                        {
+                            await transation.RollbackAsync();
+                            throw new ProductSavedFaledException();
+                        }
+                    }
+                    else
+                    {
+                        kafkaProductDTO.QuantityExist = false;
+                    }
+                }
+                Console.WriteLine($"{kafkaProductDTO.OrderId}, {kafkaProductDTO.OrderItemId}, {kafkaProductDTO.ProductExist}");
+                await _kafkaProduserService.SendMessageAsync("product-change", kafkaProductDTO);
+            }*/
+            /*if (kafkaOrderItemDTO == null || !kafkaOrderItemDTO.Any())
+            {
+                Console.WriteLine("Список товаров пуст.");
+                return;
+            }
+
+            var kafkaProductDTOs = new List<KafkaProductDTO>();
+
+            foreach (var item in kafkaOrderItemDTO)
+            {
+                KafkaProductDTO kafkaProductDTO = new KafkaProductDTO();
+                var product = await _repository.SelectProductByIdAsync(item.ProductId);
+
+                if (product == null)
+                {
+                    kafkaProductDTO.ProductExist = false;
+                    kafkaProductDTO.ProductId = item.ProductId;
+                    kafkaProductDTO.QuantityExist = false;
+                    kafkaProductDTO.OrderItemId = item.Id;
+                    kafkaProductDTO.OrderId = item.OrderId;
+                }
+                else
+                {
+                    kafkaProductDTO.ProductExist = true;
+                    kafkaProductDTO.ProductId = item.ProductId;
+
+                    if (item.Quantity <= product.StockQuantity)
+                    {
+                        kafkaProductDTO.QuantityExist = true;
+                        kafkaProductDTO.Quantity = item.Quantity;
+                        product.StockQuantity -= item.Quantity;
+
+                        kafkaProductDTO.OrderItemId = item.Id;
+                        kafkaProductDTO.OrderId = item.OrderId;
+                        kafkaProductDTO.Price = product.Price;
+
+                        var transaction = await _repository.BeginTransactionAsync();
+                        try
+                        {
+                            await _repository.SaveChangesAsync();
+                            await transaction.CommitAsync();
+                        }
+                        catch (ProductSavedFaledException)
+                        {
+                            await transaction.RollbackAsync();
+                            throw new ProductSavedFaledException();
+                        }
+                    }
+                    else
+                    {
+                        kafkaProductDTO.QuantityExist = false;
+                    }
+                }
+
+                kafkaProductDTOs.Add(kafkaProductDTO);
+                Console.WriteLine($"Обработано: OrderId: {kafkaProductDTO.OrderId}, ProductId: {kafkaProductDTO.ProductId}, ProductExist: {kafkaProductDTO.ProductExist}, QuantityExist: {kafkaProductDTO.QuantityExist}");
+            }*/
+            if (kafkaOrderItemDTO == null || !kafkaOrderItemDTO.Any())
+            {
+                Console.WriteLine("Список товаров пуст.");
+                return;
+            }
+
+            var kafkaProductDTOs = new List<KafkaProductDTO>();
+            bool allProductsValid = true; // Флаг для проверки, все ли товары корректны
+
+            foreach (var item in kafkaOrderItemDTO)
+            {
+                KafkaProductDTO kafkaProductDTO = new KafkaProductDTO();
+                var product = await _repository.SelectProductByIdAsync(item.ProductId);
+
+                if (product == null)
+                {
+                    // Если товар не найден, то не меняем количество и добавляем в DTO информацию о товаре
+                    kafkaProductDTO.ProductExist = false;
+                    kafkaProductDTO.ProductId = item.ProductId;
+                    kafkaProductDTO.QuantityExist = false;
+                    kafkaProductDTO.OrderItemId = item.Id;
+                    kafkaProductDTO.OrderId = item.OrderId;
+
+                    allProductsValid = false; // Один из товаров не найден, помечаем заказ как некорректный
+                }
+                else
+                {
+                    kafkaProductDTO.OrderId = item.OrderId;
+                    kafkaProductDTO.ProductExist = true;
+                    kafkaProductDTO.ProductId = item.ProductId;
+
+                    if (item.Quantity <= product.StockQuantity)
+                    {
+                        // Если количество товара на складе достаточное, обновляем информацию в DTO
+                        
+                        kafkaProductDTO.QuantityExist = true;
+                        kafkaProductDTO.Quantity = item.Quantity;
+                        kafkaProductDTO.Price = product.Price;
+                    }
+                    else
+                    {
+                        // Если товара недостаточно, помечаем его как отсутствующий
+                        kafkaProductDTO.QuantityExist = false;
+                    }
+
+                    // Уменьшаем количество товара на складе только после всех проверок
+                    if (kafkaProductDTO.QuantityExist)
+                    {
+                        product.StockQuantity -= item.Quantity;
+                    }
+                }
+
+                kafkaProductDTOs.Add(kafkaProductDTO);
+
+                // Логируем информацию для отладки
+                Console.WriteLine($"Обработано: OrderId: {kafkaProductDTO.OrderId}, ProductId: {kafkaProductDTO.ProductId}, ProductExist: {kafkaProductDTO.ProductExist}, QuantityExist: {kafkaProductDTO.QuantityExist}");
+            }
+
+            // Если все товары прошли проверку (все валидны), то сохраняем изменения в базе данных
+            if (allProductsValid)
+            {
+                var transaction = await _repository.BeginTransactionAsync();
+                try
+                {
+                    // Сохраняем изменения в базе данных
+                    await _repository.SaveChangesAsync();
+                    await transaction.CommitAsync(); // Подтверждаем транзакцию
+                }
+                catch (ProductSavedFaledException)
+                {
+                    await transaction.RollbackAsync();
+                    throw new ProductSavedFaledException();
+                }
+            }
+            await _kafkaProduserService.SendMessageAsync("product-change", kafkaProductDTOs);
         }
     }
 }

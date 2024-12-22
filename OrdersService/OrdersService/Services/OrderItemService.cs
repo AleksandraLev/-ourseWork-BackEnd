@@ -16,29 +16,73 @@ namespace OrdersService.Services
             _repository = repository;
             _kafkaProduserService = kafkaProduserService;
         }
-        public async Task CreateOrderItemAsync(CreateOrderItemDTO createOrderItemDTO, int orderId)
+        /*public async Task CreateOrderItemAsync(CreateOrderItemDTO createOrderItemDTO, int orderId)
         {
             OrderItem orderItem = new OrderItem
             {
                 OrderId = orderId,
                 ProductId = createOrderItemDTO.ProductId,
                 Quantity = createOrderItemDTO.Quantity,
-                Price = createOrderItemDTO.Price,
             };
-            //Console.WriteLine($"orderItem.OrderId: {orderItem.OrderId}");
-            var transation = await _repository.BeginTransactionAsync();
-            try
+            KafkaOrderItemDTO kafkaOrderItemDTO = new KafkaOrderItemDTO
             {
-                await _repository.CreateOrderItemAsync(orderItem);
-                await transation.CommitAsync();
-            }
-            catch (OrderItemSavedFailedException)
+                //Id = orderItem.Id,
+                OrderId = orderItem.OrderId,
+                ProductId = createOrderItemDTO.ProductId,
+                Quantity = createOrderItemDTO.Quantity,
+            };
+            await _kafkaProduserService.SendMessageAsync("orderItem-added", kafkaOrderItemDTO); // Доделать
+        }*/
+        public async Task CreateOrderItemsAsync(List<CreateOrderItemDTO> createOrderItems, int orderId)
+        {
+            List<KafkaOrderItemDTO> kafkaOrderItemDTOs = createOrderItems.Select(item => new KafkaOrderItemDTO
             {
-                await transation.RollbackAsync();
-                throw new OrderItemSavedFailedException();
-            }
-            await _kafkaProduserService.SendMessageAsync("orderIten-added", orderItem);
+                OrderId = orderId,
+                ProductId = item.ProductId,
+                Quantity = item.Quantity
+            }).ToList();
+
+            await _kafkaProduserService.SendMessageAsync("orderItems-added", kafkaOrderItemDTOs);
         }
+        public async Task WorkWithProductInfoAsync(List<KafkaProductDTO> kafkaProductDTO)
+        {
+            if (kafkaProductDTO != null && kafkaProductDTO.All(item => item.ProductExist && item.QuantityExist))
+            {
+                var transaction = await _repository.BeginTransactionAsync();
+
+                try
+                {
+                    foreach (var item in kafkaProductDTO)
+                    {
+                        OrderItem orderItem = new OrderItem
+                        {
+                            OrderId = item.OrderId,
+                            ProductId = item.ProductId,
+                            Quantity = item.Quantity,
+                            Price = item.Price,
+                        };
+                        await _repository.CreateOrderItemAsync(orderItem);
+                    }
+                    await transaction.CommitAsync();
+                }
+                catch (OrderItemSavedFailedException ex)
+                {
+                    await transaction.RollbackAsync();
+                    Console.WriteLine("Ошибка при сохранении элемента заказа: " + ex.Message);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    Console.WriteLine("Произошла ошибка при обработке: " + ex.Message);
+                }
+            }
+            else
+            {
+                Console.WriteLine("Невозможно обработать заказ, так как один или несколько товаров недоступны.");
+            }
+        }
+
         public async Task<List<OrderItem>> GetOrderItemsAsync(int orderId)
         {
             try

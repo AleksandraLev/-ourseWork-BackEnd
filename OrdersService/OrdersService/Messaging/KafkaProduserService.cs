@@ -1,6 +1,7 @@
 ﻿using OrdersService.Model;
 using Confluent.Kafka;
 using System.Text.Json;
+using OrdersService.DTOs;
 
 namespace OrdersService.Messaging
 {
@@ -11,16 +12,25 @@ namespace OrdersService.Messaging
         {
             var config = new ProducerConfig
             {
-                BootstrapServers = configuration["Kafka: BootstrapServers"]
+                BootstrapServers = "localhost:9092",
             };
-            _producer = new ProducerBuilder<string, string>(config).Build();
+            try
+            {
+                _producer = new ProducerBuilder<string, string>(config).Build();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка при создании Kafka Producer: {ex.Message}");
+                throw;
+            }
         }
-        public async Task SendMessageAsync(string topic, OrderItem orderItem)
+        public async Task SendMessageAsync(string topic, List<KafkaOrderItemDTO> kafkaOrderItemDTOs)
         {
             try
             {
-                var jsonMessage = JsonSerializer.Serialize(orderItem);
-                await _producer.ProduceAsync(topic, new Message<string, string> { Key = orderItem.Id.ToString(), Value = jsonMessage });
+                var jsonMessage = JsonSerializer.Serialize(kafkaOrderItemDTOs);
+                Console.WriteLine($"Отправили сообщение: {jsonMessage}");
+                await _producer.ProduceAsync(topic, new Message<string, string> { Key = kafkaOrderItemDTOs.First().OrderId.ToString(), Value = jsonMessage });
             }
             catch (ProduceException<string, string>)
             {

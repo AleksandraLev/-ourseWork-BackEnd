@@ -26,12 +26,12 @@ namespace OrdersService.Controllers
             }
             try
             {
-                await _orderService.CreateOrderAsync(createOrderDTO);
                 if (createOrderDTO.Items == null || !createOrderDTO.Items.Any())
                 {
                     return BadRequest("Список товаров пуст или не указан.");
                 }
-                return Ok("Заказ успешно создан!");
+                await _orderService.CreateOrderAsync(createOrderDTO);
+                return Ok("Заказ создан и обрабатывается!");
             }
             catch (OrderSavedFailedException)
             {
