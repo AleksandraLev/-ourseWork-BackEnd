@@ -37,6 +37,10 @@ namespace OrdersService.Controllers
             {
                 return BadRequest("Ошибка при изменении статуса заказа.");
             }
+            catch (OrderNotFoundException)
+            {
+                return BadRequest("Заказ с таким номером не найден.");
+            }
         }
     }
 }

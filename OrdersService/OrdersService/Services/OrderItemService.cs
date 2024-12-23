@@ -9,10 +9,12 @@ namespace OrdersService.Services
 {
     public class OrderItemService : IOrderItemService
     {
+        private readonly ILogger<OrderItemService> _logger;
         private readonly IOrderItemRepository _repository;
         private readonly IKafkaProduserService _kafkaProduserService;
-        public OrderItemService(IOrderItemRepository repository, IKafkaProduserService kafkaProduserService)
+        public OrderItemService(ILogger<OrderItemService> logger, IOrderItemRepository repository, IKafkaProduserService kafkaProduserService)
         {
+            _logger = logger;
             _repository = repository;
             _kafkaProduserService = kafkaProduserService;
         }
@@ -35,6 +37,7 @@ namespace OrdersService.Services
         }*/
         public async Task CreateOrderItemsAsync(List<CreateOrderItemDTO> createOrderItems, int orderId)
         {
+            _logger.LogInformation("Создание части заказа.");
             List<KafkaOrderItemDTO> kafkaOrderItemDTOs = createOrderItems.Select(item => new KafkaOrderItemDTO
             {
                 OrderId = orderId,
@@ -52,6 +55,7 @@ namespace OrdersService.Services
 
                 try
                 {
+                    _logger.LogInformation($"Обрабатывам части заказа по номером: {kafkaProductDTO[0].OrderId}");
                     foreach (var item in kafkaProductDTO)
                     {
                         OrderItem orderItem = new OrderItem
@@ -68,18 +72,18 @@ namespace OrdersService.Services
                 catch (OrderItemSavedFailedException ex)
                 {
                     await transaction.RollbackAsync();
-                    Console.WriteLine("Ошибка при сохранении элемента заказа: " + ex.Message);
+                    _logger.LogError("Ошибка при сохранении части заказа: " + ex.Message);
                     throw;
                 }
                 catch (Exception ex)
                 {
                     await transaction.RollbackAsync();
-                    Console.WriteLine("Произошла ошибка при обработке: " + ex.Message);
+                    _logger.LogError("Произошла ошибка при обработке: " + ex.Message);
                 }
             }
             else
             {
-                Console.WriteLine("Невозможно обработать заказ, так как один или несколько товаров недоступны.");
+                _logger.LogWarning("Невозможно обработать заказ, так как один или несколько товаров недоступны.");
             }
         }
 
@@ -87,14 +91,17 @@ namespace OrdersService.Services
         {
             try
             {
+                _logger.LogInformation($"Получаем часть заказа по номером: {orderId}");
                 return await _repository.SelectItemsOfOrderAsync(orderId);
             }
-            catch(ArgumentNullException)
+            catch(ArgumentNullException ex)
             {
+                _logger.LogError("Произошла ошибка при получении части заказа: " + ex.Message);
                 throw new SelectOrderItemException();
             }
-            catch(OperationCanceledException)
+            catch(OperationCanceledException ex)
             {
+                _logger.LogError("Произошла ошибка при получении части заказа: " + ex.Message);
                 throw new SelectOrderItemException();
             }
         }

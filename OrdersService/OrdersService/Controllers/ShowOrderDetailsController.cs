@@ -32,7 +32,11 @@ namespace OrdersService.Controllers
             }
             catch (SelectOrderException)
             {
-                return BadRequest("Ошибка при создании заказа.");
+                return BadRequest("Ошибка при полученни данных о заказе.");
+            }
+            catch (OrderNotFoundException)
+            {
+                return BadRequest("Заказ с таким номером не найден.");
             }
         }
     }

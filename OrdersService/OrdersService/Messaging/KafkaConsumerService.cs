@@ -10,9 +10,10 @@ namespace OrdersService.Messaging
 {
     public class KafkaConsumerService : IKafkaConsumerService
     {
+        private readonly ILogger<KafkaConsumerService> _logger;
         private readonly IConsumer<string, string> _consumer;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        public KafkaConsumerService(IConfiguration configuration, IServiceScopeFactory serviceScopeFactory)
+        public KafkaConsumerService(ILogger<KafkaConsumerService> logger, IConfiguration configuration, IServiceScopeFactory serviceScopeFactory)
         {
             var config = new ConsumerConfig
             {
@@ -21,6 +22,7 @@ namespace OrdersService.Messaging
                 AutoOffsetReset = AutoOffsetReset.Earliest,
                 EnableAutoCommit = false
             };
+            _logger = logger;
             _consumer = new ConsumerBuilder<string, string>(config).Build();
             _serviceScopeFactory = serviceScopeFactory;
         }
@@ -42,10 +44,10 @@ namespace OrdersService.Messaging
                             var kafkaProductDTO = JsonSerializer.Deserialize<List<KafkaProductDTO>>(producer_message.Message.Value);
                             if (kafkaProductDTO != null)
                             {
-                                Console.WriteLine("Список товаров в заказе:");
+                                _logger.LogInformation("Список товаров в заказе:");
                                 foreach (var item in kafkaProductDTO)
                                 {
-                                    Console.WriteLine($"OrderId: {item.OrderId}, ProductId: {item.ProductId}, Quantity: {item.Quantity}");
+                                    _logger.LogInformation($"OrderId: {item.OrderId}, ProductId: {item.ProductId}, Quantity: {item.Quantity}");
                                 }
                                 await WorkWithOrderInfoMessageAsync(kafkaProductDTO, cancellationToken);
                             }
@@ -57,6 +59,7 @@ namespace OrdersService.Messaging
 
         public async Task WorkWithOrderInfoMessageAsync(List<KafkaProductDTO> kafkaProductDTO, CancellationToken cancellationToken)
         {
+            _logger.LogInformation("Обработка сообщения product-change");
             if (cancellationToken.IsCancellationRequested)
             {
                 return;
@@ -83,16 +86,17 @@ namespace OrdersService.Messaging
             }
             catch (OrderSavedFailedException)
             {
-                Console.WriteLine("Не удалось обработать сообщение product-change.");
+                _logger.LogError("Не удалось обработать сообщение product-change.");
             }
             catch (ChangeOrderStatusException)
             {
-                Console.WriteLine("Не удалось обработать сообщение product-change.");
+                _logger.LogError("Не удалось обработать сообщение product-change.");
             }
             catch (OrderItemSavedFailedException)
             {
-                Console.WriteLine("Не удалось обработать сообщение product-change.");
+                _logger.LogError("Не удалось обработать сообщение product-change.");
             }
+            _logger.LogInformation("Сообщение product-change обработано.");
         }
     }
 }
